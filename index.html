@@ -47,6 +47,8 @@ td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .q{color:var(--amber);font-size:11px;margin-left:4px}
 .nm{color:var(--mute);font-size:12px;white-space:normal;max-width:260px}
 .chg{font-size:11px;color:var(--amber)}
+.fb{font-size:11px;margin-top:3px;white-space:nowrap}.fb a{color:var(--mute);text-decoration:none;border:1px solid var(--line);border-radius:5px;padding:0 5px}.fb a:hover{color:var(--ink);border-color:#a8a29e}
+@media print{.fb{display:none}}
 .count{color:var(--mute);padding:0 28px 6px;font-size:12.5px}
 .center{max-width:520px;margin:15vh auto;text-align:center;color:var(--mute)}
 .help{font-size:12.5px;color:var(--mute);margin-top:8px}
@@ -91,7 +93,7 @@ function visible(){
 function render(){
   const S=D.sites, st=D.stats, status=D.status||{};
   const shopCards=S.map(s=>{const x=status[s]||{};const cls=!x.products?'bad':String(x.source||'').startsWith('via')?'warn':'ok';
-    return `<div class="shop"><b><span class="dot ${cls}"></span>${esc(s)}</b><span class="sub">${x.products?x.products.toLocaleString('da-DK')+' vørur lisnar':'Kundi ikki lesast hesa vikuna'}${x.source&&x.products?' · '+esc(String(x.source).replace('direct','lisið beinleiðis').replace('via your Mac','lisið um tína Mac')):''}</span><br><span class="sub">${st.per_site?.[s]||0} samanbornar við MP</span></div>`}).join('');
+    return `<div class="shop"><b><span class="dot ${cls}"></span>${esc(s)}</b><span class="sub">${x.products?x.products.toLocaleString('da-DK')+' vørur lisnar':'Kundi ikki lesast hesa vikuna'}${x.source&&x.products?' · '+esc(String(x.source).replace('direct','lisið beinleiðis').replace('via your Mac','lisið um tína Mac')):''}</span><br><span class="sub">${st.per_site?.[s]||0} samanbornar við MP</span>${(D.extra?.[s]||[0,0])[1]?`<br><span class="sub">+${((D.extra[s][0]+D.extra[s][1])/2)}% flutningur løgdur aftrat (${D.extra[s][0]}–${D.extra[s][1]}%)</span>`:''}</div>`}).join('');
   $('#app').innerHTML=`
   <div class="top"><h1>Príssamanbering</h1>
     <select id="wk" class="btn">${weeks.map(w=>`<option ${w===D.date?'selected':''}>${w}</option>`).join('')}</select>
@@ -106,7 +108,7 @@ function render(){
         <label style="display:block;padding:8px 10px" class="sub"><input type="checkbox" id="onlyvis" checked> Bert tað, ið sæst (filtur og leiting)</label>
       </div></div>
   </div>
-  <p class="lead">handil.mp.fo samanborið við ${S.map(esc).join(', ')}. Allir prísir eru við mvg. Útlendskir handlar eru uttan flutning til Føroya.</p>
+  <p class="lead">handil.mp.fo samanborið við ${S.map(esc).join(', ')}. Allir prísir eru við 25% mvg. Har ein handil hevur flutning ásettan, er hann lagdur afturát prísinum (sum víst undir Handlar).</p>
   <div class="kpis">
     <div class="kpi"><b>${st.mp.toLocaleString('da-DK')}</b><span>vørur á handil.mp.fo</span></div>
     ${S.map(s=>`<div class="kpi"><b>${st.per_site?.[s]||0}</b><span>samanbornar við ${esc(s)}</span></div>`).join('')}
@@ -139,7 +141,12 @@ function render(){
   table();
 }
 function cell(r,s){const x=r.s[s]; if(!x) return '<td></td><td></td>';
-  return `<td class="n"><a href="${esc(x.url)}" target="_blank">${kr(x.price)}</a>${x.sure?'':'<span class="q" title="Ikki góðkent par">?</span>'}${x.prev&&x.prev!==x.price?`<div class="chg">var ${kr(x.prev)}</div>`:''}<div class="nm">${esc(x.name)}</div></td><td class="n">${pcF(x.pct)}</td>`}
+  return `<td class="n"><a href="${esc(x.url)}" target="_blank" title="${x.shop_price&&x.shop_price!==x.price?'Prísur á heimasíðuni: '+kr(x.shop_price)+' + '+((x.extra[0]+x.extra[1])/2)+'% flutningur':''}">${kr(x.price)}</a>${x.shop_price&&x.shop_price!==x.price?`<div class="chg" style="color:var(--mute)">${kr(x.shop_price)} + flutn.</div>`:''}${x.sure?'':'<span class="q" title="Ikki góðkent par">?</span>'}${x.prev&&x.prev!==x.price?`<div class="chg">var ${kr(x.prev)}</div>`:''}<div class="nm">${esc(x.name)}</div>${fb(r,s,x)}</td><td class="n" title="${x.pct_range?'Við '+x.extra[1]+'% flutning: '+x.pct_range[0].toFixed(0)+'%, við '+x.extra[0]+'%: '+x.pct_range[1].toFixed(0)+'%':''}">${pcF(x.pct)}</td>`}
+function fb(r,s,x){ if(!D.repo||!x.other_id) return '';
+  const key=`<!-- pair:${r.mp_id}|${s}|${x.other_id} -->`;
+  const url=(lab,word)=>`https://github.com/${D.repo}/issues/new?labels=${lab}&title=${encodeURIComponent(word+': '+r.name+' \u2194 '+s+': '+(x.name||''))}&body=${encodeURIComponent('MP '+r.mp_id+': '+r.name+'\n'+s+': '+(x.name||'')+'\n\nTr\u00fdst \u00e1 Create \u2013 so ver\u00f0ur hetta skr\u00e1sett vi\u00f0 n\u00e6stu koyring.\n'+key)}`;
+  return `<div class="fb"><a href="${url('rangt-par','Rangt par')}" target="_blank" title="Hetta er ikki sama v\u00f8ra">\u2717 Rangt</a>${x.sure?'':` <a href="${url('raett-par','R\u00e6tt par')}" target="_blank" title="Hetta er sama v\u00f8ra">\u2713 R\u00e6tt</a>`}</div>`;
+}
 function table(){
   const rows=visible();
   $('#cnt').textContent=`${rows.length} av ${D.rows.length} vørum`;
@@ -150,9 +157,9 @@ function table(){
 function grid(){
   const rows=$('#onlyvis')?.checked?visible():D.rows, S=D.sites;
   const head=['MP nr','Vøra','Bólkur','MP kr (m/mvg)'];
-  S.forEach(s=>head.push(`${s} kr`,`MP vs ${s} %`,`${s} góðkent`,`${s} vøra`,`${s} leinki`));
+  S.forEach(s=>head.push(`${s} kr (m/flutningi)`,`${s} kr á heimasíðu`,`MP vs ${s} %`,`${s} góðkent`,`${s} vøra`,`${s} leinki`));
   const body=rows.map(r=>{const l=[r.mp_id,r.name,r.category,r.mp];
-    S.forEach(s=>{const x=r.s[s]; l.push(x?x.price:null,x&&x.pct!=null?Math.round(x.pct*10)/10:null,x?(x.sure?'ja':'?'):null,x?x.name:null,x?x.url:null)}); return l;});
+    S.forEach(s=>{const x=r.s[s]; l.push(x?x.price:null,x?(x.shop_price??x.price):null,x&&x.pct!=null?Math.round(x.pct*10)/10:null,x?(x.sure?'ja':'?'):null,x?x.name:null,x?x.url:null)}); return l;});
   return [head,...body];
 }
 function save(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
