@@ -120,6 +120,7 @@ function render(){
     <div class="help">Legg ein handil afturat: trýst á <a class="btn" style="padding:3px 8px" href="${esc(D.edit_sites_url)}" target="_blank">Broyt handlalistan</a>, skriva eina nýggja linju sum
       <code>Navn;sitemap;https://www.handil.dk</code> og trýst <b>Commit changes</b>. Kemur við í næstu koyring
       (ella <a href="${esc(D.run_url)}" target="_blank">koyr nú</a>). Slag: <code>woocommerce</code>, <code>shopify</code>, <code>billigvvs</code> ella <code>sitemap</code> (flest onnur).</div></div>
+  ${(D.lists||[]).length?`<div class="panel"><h2>V\u00f8rulistar \u2013 alt sum var lisi\u00f0 \u00far handlunum</h2><div class="shops">${D.lists.map((l,i)=>`<div class="shop"><b>${esc(l.name)}</b><span class="sub">${l.rows.toLocaleString('da-DK')} v\u00f8rur \u00b7 ${l.columns} teigar</span><br><button class="btn" style="padding:3px 9px;margin-top:6px" data-list="${i}" data-kind="xlsx">Excel</button> <button class="btn" style="padding:3px 9px" data-list="${i}" data-kind="csv">CSV</button></div>`).join('')}</div><div class="help">Allur listin, ikki bert t\u00e6r samanbornu v\u00f8rurnar. Lesi\u00f0 ${esc(D.date)}.</div></div>`:''}
   <div class="bar">
     <button class="chip ${f==='all'?'on':''}" data-f="all">Allar</button><button class="chip ${f==='dearer'?'on':''}" data-f="dearer">MP dýrari</button>
     <button class="chip ${f==='cheaper'?'on':''}" data-f="cheaper">MP bíligari</button><button class="chip ${f==='changed'?'on':''}" data-f="changed">Broyttir prísir</button>
@@ -138,6 +139,7 @@ function render(){
   document.body.onclick=()=>$('#menu')?.classList.remove('open');
   $('#menu').onclick=e=>e.stopPropagation();
   document.querySelectorAll('#menu button').forEach(b=>b.onclick=()=>{$('#menu').classList.remove('open');download(b.dataset.d)});
+  document.querySelectorAll('[data-list]').forEach(b=>b.onclick=()=>downloadList(+b.dataset.list,b.dataset.kind,b));
   table();
 }
 function cell(r,s){const x=r.s[s]; if(!x) return '<td></td><td></td>';
@@ -173,6 +175,20 @@ function download(kind){
     return save(base+'.csv',new Blob(['﻿'+g.map(r=>r.map(c).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
   }
   if(kind==='xlsx') return save(base+'.xlsx',xlsx(g));
+}
+async function downloadList(i,kind,btn){
+  const l=D.lists[i], old=btn.textContent; btn.textContent='Heintar\u2026'; btn.disabled=true;
+  try{
+    const k=await key(); const b=Uint8Array.from(atob((await (await fetch(l.file+'?'+Date.now())).text()).trim()),c=>c.charCodeAt(0));
+    const gz=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},k,b.slice(12));
+    const txt=await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+    const t=JSON.parse(txt), g=[t.columns,...t.rows], base=`vorulisti-${l.name.replace(/[^\w.-]+/g,'-')}-${t.date}`;
+    if(kind==='csv'){
+      const c=v=>v==null?'':typeof v==='number'?String(v).replace('.',','):typeof v==='boolean'?(v?'ja':'nei'):/[;"\n\r]/.test(String(v))?`"${String(v).replace(/"/g,'""')}"`:String(v);
+      save(base+'.csv',new Blob(['\ufeff'+g.map(r=>r.map(c).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+    } else save(base+'.xlsx',xlsx(g.map(r=>r.map(v=>typeof v==='boolean'?(v?'ja':'nei'):v))));
+  }catch(e){ alert('Kundi ikki heinta listan: '+e.message); }
+  btn.textContent=old; btn.disabled=false;
 }
 // minimal .xlsx writer (one sheet, numbers + text)
 function xlsx(rows){
