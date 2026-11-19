@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="fo"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>MP Príssamanbering</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1917;--mute:#78716c;--line:#e7e5e4;--red:#b91c1c;--green:#15803d;--amber:#b45309;--accent:#0f4c81}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+a{color:inherit}
+.top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:20px 28px 6px}
+.top h1{margin:0;font-size:21px;letter-spacing:-.01em}
+.top .sp{flex:1}
+select,button,input{font:inherit}
+.btn{border:1px solid var(--line);background:var(--card);padding:7px 12px;border-radius:8px;cursor:pointer;color:var(--ink);text-decoration:none;display:inline-flex;gap:6px;align-items:center}
+.btn:hover{border-color:#a8a29e}
+.btn.dark{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sub{color:var(--mute);font-size:12.5px}
+.lead{padding:0 28px;color:var(--mute)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;padding:14px 28px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--mute);font-size:12px}
+.panel{margin:4px 28px 10px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.panel h2{font-size:14px;margin:0 0 8px}
+.shops{display:flex;gap:8px;flex-wrap:wrap}
+.shop{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:180px}
+.shop b{display:block}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.ok{background:var(--green)}.warn{background:var(--amber)}.bad{background:var(--red)}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 28px}
+.chip{border:1px solid var(--line);background:var(--card);padding:6px 12px;border-radius:999px;cursor:pointer}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.bar input{padding:7px 10px;border:1px solid var(--line);border-radius:8px;min-width:220px;background:var(--card)}
+.dl{position:relative}
+.menu{position:absolute;right:0;top:110%;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.08);padding:6px;display:none;z-index:5;min-width:260px}
+.menu.open{display:block}
+.menu button{display:block;width:100%;text-align:left;border:0;background:none;padding:8px 10px;border-radius:6px;cursor:pointer}
+.menu button:hover{background:#f5f5f4}
+.menu small{display:block;color:var(--mute)}
+.wrap{padding:6px 28px 40px;overflow:auto}
+table{border-collapse:collapse;width:100%;background:var(--card);border:1px solid var(--line)}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{background:#f5f5f4;font-weight:600;cursor:pointer;white-space:nowrap;position:sticky;top:0}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.up{color:var(--red);font-weight:600}.down{color:var(--green);font-weight:600}
+.q{color:var(--amber);font-size:11px;margin-left:4px}
+.nm{color:var(--mute);font-size:12px;white-space:normal;max-width:260px}
+.chg{font-size:11px;color:var(--amber)}
+.count{color:var(--mute);padding:0 28px 6px;font-size:12.5px}
+.center{max-width:520px;margin:15vh auto;text-align:center;color:var(--mute)}
+.help{font-size:12.5px;color:var(--mute);margin-top:8px}
+.help code{background:#f5f5f4;padding:1px 5px;border-radius:4px;color:var(--ink)}
+@media print{.bar,.dl,.top .btn,.panel .btn,select{display:none!important}body{background:#fff}th{position:static}.wrap{overflow:visible}}
+</style></head>
+<body>
+<div id="app"><div class="center">Opnar…</div></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const kr=v=>v==null?'':Number(v).toLocaleString('da-DK',{minimumFractionDigits:2,maximumFractionDigits:2});
+const pcF=v=>v==null?'':`<span class="${v>5?'up':v<-5?'down':''}">${v>0?'+':''}${v.toFixed(0)}%</span>`;
+let D=null, f='all', sk=null, dir=-1, weeks=[];
+
+async function key(){
+  const k=location.hash.slice(1); if(!k) return null;
+  const raw=Uint8Array.from(atob(k.replace(/-/g,'+').replace(/_/g,'/')+'==='.slice((k.length+3)%4)),c=>c.charCodeAt(0));
+  return crypto.subtle.importKey('raw',raw,'AES-GCM',false,['decrypt']);
+}
+async function load(week){
+  const k=await key();
+  if(!k){ $('#app').innerHTML='<div class="center">Hesin síðan krevur tað fulla leinkið (við lyklinum eftir #). Brúka leinkið úr teldupostinum.</div>'; return; }
+  if(!weeks.length) weeks=await (await fetch('weeks.json?'+Date.now())).json();
+  week=week||weeks[0];
+  const b=Uint8Array.from(atob((await (await fetch(`weeks/${week}.enc?`+Date.now())).text()).trim()),c=>c.charCodeAt(0));
+  try{ D=JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},k,b.slice(12)))); }
+  catch(e){ $('#app').innerHTML='<div class="center">Lykilin passar ikki. Brúka leinkið úr seinasta teldupostinum.</div>'; return; }
+  sk=D.sites.length?'pct:'+D.sites[0]:'name';
+  render();
+}
+function val(r,k){ if(k==='name')return r.name; if(k==='mp')return r.mp; const [t,s]=[k.slice(0,k.indexOf(':')),k.slice(k.indexOf(':')+1)]; const x=r.s[s]; return x?(t==='pct'?x.pct:x.price):null; }
+function visible(){
+  const q=($('#q')?.value||'').toLowerCase();
+  return D.rows.filter(r=>{const xs=Object.values(r.s),p=xs.map(x=>x.pct).filter(v=>v!=null);
+    if(f==='dearer'&&!p.some(v=>v>5))return false; if(f==='cheaper'&&!p.some(v=>v<-5))return false;
+    if(f==='changed'&&!(xs.some(x=>x.prev&&x.prev!==x.price)||(r.mp_prev&&r.mp_prev!==r.mp)))return false;
+    if(f==='unsure'&&!xs.some(x=>!x.sure))return false;
+    return !q||r.name.toLowerCase().includes(q)||String(r.mp_id).includes(q)||xs.some(x=>(x.name||'').toLowerCase().includes(q))})
+   .sort((a,b)=>{const x=val(a,sk),y=val(b,sk);if(x==null)return 1;if(y==null)return -1;return (x>y?1:x<y?-1:0)*dir});
+}
+function render(){
+  const S=D.sites, st=D.stats, status=D.status||{};
+  const shopCards=S.map(s=>{const x=status[s]||{};const cls=!x.products?'bad':String(x.source||'').startsWith('via')?'warn':'ok';
+    return `<div class="shop"><b><span class="dot ${cls}"></span>${esc(s)}</b><span class="sub">${x.products?x.products.toLocaleString('da-DK')+' vørur lisnar':'Kundi ikki lesast hesa vikuna'}${x.source&&x.products?' · '+esc(String(x.source).replace('direct','lisið beinleiðis').replace('via your Mac','lisið um tína Mac')):''}</span><br><span class="sub">${st.per_site?.[s]||0} samanbornar við MP</span></div>`}).join('');
+  $('#app').innerHTML=`
+  <div class="top"><h1>Príssamanbering</h1>
+    <select id="wk" class="btn">${weeks.map(w=>`<option ${w===D.date?'selected':''}>${w}</option>`).join('')}</select>
+    <span class="sp"></span>
+    ${D.issue_url&&st.check?`<a class="btn" href="${esc(D.issue_url)}" target="_blank">🟠 ${st.check} pør at góðkenna</a>`:''}
+    <div class="dl"><button class="btn dark" id="dlb">⬇ Tak niður</button>
+      <div class="menu" id="menu">
+        <button data-d="xlsx">Excel (.xlsx)<small>Opnast beinleiðis í Excel</small></button>
+        <button data-d="csv">CSV<small>Til Excel, Numbers ella Google Sheets</small></button>
+        <button data-d="pdf">PDF / prenta<small>Vel "Goym sum PDF" í prentvindeyganum</small></button>
+        <button data-d="json">JSON<small>Til aðrar skipanir</small></button>
+        <label style="display:block;padding:8px 10px" class="sub"><input type="checkbox" id="onlyvis" checked> Bert tað, ið sæst (filtur og leiting)</label>
+      </div></div>
+  </div>
+  <p class="lead">handil.mp.fo samanborið við ${S.map(esc).join(', ')}. Allir prísir eru við mvg. Útlendskir handlar eru uttan flutning til Føroya.</p>
+  <div class="kpis">
+    <div class="kpi"><b>${st.mp.toLocaleString('da-DK')}</b><span>vørur á handil.mp.fo</span></div>
+    ${S.map(s=>`<div class="kpi"><b>${st.per_site?.[s]||0}</b><span>samanbornar við ${esc(s)}</span></div>`).join('')}
+    <div class="kpi"><b class="up">${st.dearer}</b><span>MP >5% dýrari enn ${esc(st.main)}</span></div>
+    <div class="kpi"><b class="down">${st.cheaper}</b><span>MP >5% bíligari enn ${esc(st.main)}</span></div>
+    <div class="kpi"><b>${st.changed}</b><span>prísbroytingar síðan seinast</span></div>
+  </div>
+  <div class="panel"><h2>Handlar</h2><div class="shops">${shopCards}</div>
+    <div class="help">Legg ein handil afturat: trýst á <a class="btn" style="padding:3px 8px" href="${esc(D.edit_sites_url)}" target="_blank">Broyt handlalistan</a>, skriva eina nýggja linju sum
+      <code>Navn;sitemap;https://www.handil.dk</code> og trýst <b>Commit changes</b>. Kemur við í næstu koyring
+      (ella <a href="${esc(D.run_url)}" target="_blank">koyr nú</a>). Slag: <code>woocommerce</code>, <code>shopify</code>, <code>billigvvs</code> ella <code>sitemap</code> (flest onnur).</div></div>
+  <div class="bar">
+    <button class="chip ${f==='all'?'on':''}" data-f="all">Allar</button><button class="chip ${f==='dearer'?'on':''}" data-f="dearer">MP dýrari</button>
+    <button class="chip ${f==='cheaper'?'on':''}" data-f="cheaper">MP bíligari</button><button class="chip ${f==='changed'?'on':''}" data-f="changed">Broyttir prísir</button>
+    <button class="chip ${f==='unsure'?'on':''}" data-f="unsure">Óvissir pør</button><input id="q" placeholder="Leita eftir vøru ella nummari…">
+  </div>
+  <div class="count" id="cnt"></div>
+  <div class="wrap"><table><thead><tr>
+    <th data-k="name">Vøra</th><th data-k="mp">MP</th>
+    ${S.map(s=>`<th data-k="price:${esc(s)}">${esc(s)}</th><th data-k="pct:${esc(s)}">MP vs</th>`).join('')}
+  </tr></thead><tbody id="tb"></tbody></table></div>`;
+  $('#wk').onchange=e=>load(e.target.value);
+  document.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{f=b.dataset.f;document.querySelectorAll('.chip').forEach(x=>x.classList.toggle('on',x===b));table()});
+  document.querySelectorAll('th').forEach(t=>t.onclick=()=>{const k=t.dataset.k;dir=sk===k?-dir:-1;sk=k;table()});
+  $('#q').oninput=table;
+  $('#dlb').onclick=e=>{e.stopPropagation();$('#menu').classList.toggle('open')};
+  document.body.onclick=()=>$('#menu')?.classList.remove('open');
+  $('#menu').onclick=e=>e.stopPropagation();
+  document.querySelectorAll('#menu button').forEach(b=>b.onclick=()=>{$('#menu').classList.remove('open');download(b.dataset.d)});
+  table();
+}
+function cell(r,s){const x=r.s[s]; if(!x) return '<td></td><td></td>';
+  return `<td class="n"><a href="${esc(x.url)}" target="_blank">${kr(x.price)}</a>${x.sure?'':'<span class="q" title="Ikki góðkent par">?</span>'}${x.prev&&x.prev!==x.price?`<div class="chg">var ${kr(x.prev)}</div>`:''}<div class="nm">${esc(x.name)}</div></td><td class="n">${pcF(x.pct)}</td>`}
+function table(){
+  const rows=visible();
+  $('#cnt').textContent=`${rows.length} av ${D.rows.length} vørum`;
+  $('#tb').innerHTML=rows.map(r=>`<tr><td><a href="${esc(r.url)}" target="_blank">${esc(r.name)}</a><div class="nm">${esc(r.mp_id)} · ${esc(r.category)}</div></td>
+    <td class="n">${kr(r.mp)}${r.mp_prev&&r.mp_prev!==r.mp?`<div class="chg">var ${kr(r.mp_prev)}</div>`:''}</td>${D.sites.map(s=>cell(r,s)).join('')}</tr>`).join('');
+}
+// ---------- downloads
+function grid(){
+  const rows=$('#onlyvis')?.checked?visible():D.rows, S=D.sites;
+  const head=['MP nr','Vøra','Bólkur','MP kr (m/mvg)'];
+  S.forEach(s=>head.push(`${s} kr`,`MP vs ${s} %`,`${s} góðkent`,`${s} vøra`,`${s} leinki`));
+  const body=rows.map(r=>{const l=[r.mp_id,r.name,r.category,r.mp];
+    S.forEach(s=>{const x=r.s[s]; l.push(x?x.price:null,x&&x.pct!=null?Math.round(x.pct*10)/10:null,x?(x.sure?'ja':'?'):null,x?x.name:null,x?x.url:null)}); return l;});
+  return [head,...body];
+}
+function save(name,blob){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)}
+function download(kind){
+  const base=`prisir-${D.date}`;
+  if(kind==='pdf') return window.print();
+  if(kind==='json') return save(base+'.json',new Blob([JSON.stringify({date:D.date,sites:D.sites,rows:$('#onlyvis')?.checked?visible():D.rows},null,1)],{type:'application/json'}));
+  const g=grid();
+  if(kind==='csv'){
+    const c=v=>v==null?'':typeof v==='number'?String(v).replace('.',','):/[;"\n]/.test(v)?`"${String(v).replace(/"/g,'""')}"`:v;
+    return save(base+'.csv',new Blob(['﻿'+g.map(r=>r.map(c).join(';')).join('\r\n')],{type:'text/csv;charset=utf-8'}));
+  }
+  if(kind==='xlsx') return save(base+'.xlsx',xlsx(g));
+}
+// minimal .xlsx writer (one sheet, numbers + text)
+function xlsx(rows){
+  const x=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
+  const col=i=>{let s='';i++;while(i){const m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=(i-m-1)/26}return s};
+  const sheet='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetData>'+
+    rows.map((r,i)=>`<row r="${i+1}">`+r.map((v,j)=>v==null||v===''?'':typeof v==='number'?`<c r="${col(j)}${i+1}"${i?'':' s="1"'}><v>${v}</v></c>`:`<c r="${col(j)}${i+1}" t="inlineStr"${i?'':' s="1"'}><is><t xml:space="preserve">${x(v)}</t></is></c>`).join('')+'</row>').join('')+
+    `</sheetData><autoFilter ref="A1:${col(rows[0].length-1)}${rows.length}"/></worksheet>`;
+  const files={
+    '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Prisir" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">Prisir!$A$1:$'+col(rows[0].length-1)+'$'+rows.length+'</definedName></definedNames></workbook>',
+    'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+    'xl/styles.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>',
+    'xl/worksheets/sheet1.xml':sheet};
+  return new Blob([zip(files)],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+function zip(files){
+  const enc=new TextEncoder(), parts=[], central=[]; let off=0;
+  const u16=v=>[v&255,(v>>8)&255], u32=v=>[v&255,(v>>8)&255,(v>>16)&255,(v>>>24)&255];
+  for(const [name,txt] of Object.entries(files)){
+    const nb=enc.encode(name), d=enc.encode(txt), c=crc32(d);
+    const head=[...u32(0x04034b50),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),...u32(c),...u32(d.length),...u32(d.length),...u16(nb.length),...u16(0)];
+    parts.push(new Uint8Array(head),nb,d);
+    central.push(new Uint8Array([...u32(0x02014b50),...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0),...u32(c),...u32(d.length),...u32(d.length),...u16(nb.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nb);
+    off+=head.length+nb.length+d.length;
+  }
+  const cdSize=central.reduce((a,b)=>a+b.length,0);
+  return new Blob([...parts,...central,new Uint8Array([...u32(0x06054b50),...u16(0),...u16(0),...u16(Object.keys(files).length),...u16(Object.keys(files).length),...u32(cdSize),...u32(off),...u16(0)])]);
+}
+load();
+</script>
+</body></html>
